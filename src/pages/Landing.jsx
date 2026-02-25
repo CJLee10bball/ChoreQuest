@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import Toast from '../components/shared/Toast';
 
 export default function Landing() {
-  const { state, dispatch, family } = useApp();
+  const { state, dispatch, family, joinFamily, joining } = useApp();
   const [tab, setTab] = useState('join');        // join | create
   const [familyCode, setFamilyCode] = useState('');
   const [familyName, setFamilyName] = useState('');
@@ -12,15 +12,13 @@ export default function Landing() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null);
 
-  function handleJoin(e) {
+  async function handleJoin(e) {
     e.preventDefault();
-    const code = familyCode.trim().toUpperCase();
-    if (!state.families[code]) {
-      setError('No realm found with that code. Check thy spelling!');
-      return;
+    setError('');
+    const result = await joinFamily(familyCode);
+    if (!result.success) {
+      setError(result.error);
     }
-    dispatch({ type: 'JOIN_FAMILY', code });
-    setToast({ message: 'Welcome back to the realm!', type: 'success' });
   }
 
   function handleCreate(e) {
@@ -87,8 +85,8 @@ export default function Landing() {
                 />
               </div>
               {error && <p className="text-red-700 text-xs font-semibold text-center">{error}</p>}
-              <button type="submit" className="btn-gold w-full py-2 text-sm">
-                ⚔️ Enter the Realm
+              <button type="submit" disabled={joining} className="btn-gold w-full py-2 text-sm disabled:opacity-60">
+                {joining ? '🔍 Searching the realm...' : '⚔️ Enter the Realm'}
               </button>
             </form>
           ) : (
@@ -143,7 +141,7 @@ export default function Landing() {
       </div>
 
       <p className="text-amber-800/60 text-xs mt-6 text-center max-w-xs">
-        Your realm data is stored safely on this device. Share your realm code with family members to let them join.
+        Share your realm code with family members so they can join from any device.
       </p>
     </div>
   );

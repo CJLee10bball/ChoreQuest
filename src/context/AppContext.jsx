@@ -1,6 +1,7 @@
-import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { LEVEL_THRESHOLDS } from '../data/preloadedChores';
+import { supabase } from '../lib/supabase';
 
 const AppContext = createContext(null);
 
@@ -58,6 +59,15 @@ function reducer(state, action) {
         families: { ...state.families, [code]: family },
         currentFamily: code,
         currentView: 'parent',
+      };
+    }
+
+    case 'LOAD_FAMILY': {
+      // Merge a family fetched from Supabase into local state
+      const family = action.family;
+      return {
+        ...state,
+        families: { ...state.families, [family.code]: family },
       };
     }
 
@@ -195,7 +205,6 @@ function reducer(state, action) {
     }
 
     case 'SUBMIT_COMPLETION': {
-      // Kid marks chore done (photo optional). Coins awarded immediately.
       const family = state.families[state.currentFamily];
       const chore = family.chores.find(c => c.id === action.choreId);
       if (!chore) return state;
@@ -207,10 +216,9 @@ function reducer(state, action) {
         photoData: action.photoData || null,
         submittedAt: new Date().toISOString(),
         approvedAt: null,
-        status: 'pending', // pending | approved | rejected
+        status: 'pending',
       };
 
-      // Award coins + XP immediately
       const updatedKids = family.kids.map(k => {
         if (k.id !== action.kidId) return k;
         return {
@@ -253,7 +261,6 @@ function reducer(state, action) {
     }
 
     case 'REJECT_COMPLETION': {
-      // Return coins/xp to kid
       const family = state.families[state.currentFamily];
       const completion = family.pendingCompletions.find(p => p.id === action.completionId);
       if (!completion) return state;
@@ -332,6 +339,11 @@ export function AppProvider({ children }) {
     return init;
   });
 
+  const [joining, setJoining] = useState(false);
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  // Persist to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       families: state.families,
@@ -339,13 +351,71 @@ export function AppProvider({ children }) {
     }));
   }, [state.families, state.currentFamily]);
 
+  // On mount: refresh current family from Supabase so all devices see latest data
+  useEffect(() => {
+    if (!supabase || !state.currentFamily) return;
+    supabase
+      .from('families')
+      .select('data')
+      .eq('code', state.currentFamily)
+      .single()
+      .then(({ data }) => {
+        if (data?.data) dispatch({ type: 'LOAD_FAMILY', family: data.data });
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync families to Supabase whenever they change
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!supabase) return;
+    if (!mounted.current) { mounted.current = true; return; } // skip initial load
+    Object.values(state.families).forEach(family => {
+      supabase
+        .from('families')
+        .upsert({ code: family.code, data: family, updated_at: new Date().toISOString() });
+    });
+  }, [state.families]);
+
+  // Async join: checks Supabase if realm code isn't in local state
+  const joinFamily = useCallback(async (code) => {
+    const upperCode = code.trim().toUpperCase();
+
+    if (stateRef.current.families[upperCode]) {
+      dispatch({ type: 'JOIN_FAMILY', code: upperCode });
+      return { success: true };
+    }
+
+    if (!supabase) {
+      return { success: false, error: 'No realm found with that code. Check thy spelling!' };
+    }
+
+    setJoining(true);
+    try {
+      const { data } = await supabase
+        .from('families')
+        .select('data')
+        .eq('code', upperCode)
+        .single();
+
+      if (data?.data) {
+        dispatch({ type: 'LOAD_FAMILY', family: data.data });
+        dispatch({ type: 'JOIN_FAMILY', code: upperCode });
+        return { success: true };
+      }
+      return { success: false, error: 'No realm found with that code. Check thy spelling!' };
+    } catch {
+      return { success: false, error: 'No realm found with that code. Check thy spelling!' };
+    } finally {
+      setJoining(false);
+    }
+  }, []);
+
   const family = state.currentFamily ? state.families[state.currentFamily] : null;
 
   const getKid = useCallback((kidId) => {
     return family?.kids.find(k => k.id === kidId) || null;
   }, [family]);
 
-  // Check if a chore was completed today by a kid
   const isChoreCompletedToday = useCallback((choreId, kidId) => {
     if (!family) return false;
     const today = new Date().toDateString();
@@ -363,6 +433,8 @@ export function AppProvider({ children }) {
     family,
     getKid,
     isChoreCompletedToday,
+    joinFamily,
+    joining,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
