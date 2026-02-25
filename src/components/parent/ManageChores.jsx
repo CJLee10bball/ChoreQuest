@@ -5,6 +5,87 @@ import Modal from '../shared/Modal';
 
 const ICONS = ['📋','🧹','🍽️','🛏️','🗑️','💧','🐾','🌿','⚔️','🛡️','📜','🏰','🪙','🐉','🔥','🧽'];
 const TIERS = ['daily','weekly','bonus'];
+const inputClass = "w-full px-3 py-2 rounded border-2 border-amber-700 bg-amber-50 text-amber-900 focus:outline-none text-sm";
+
+function ChoreForm({ onCancel, onSubmit, form, setForm, editChore, kids, toggleAssign }) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Quest Name</label>
+          <input className={inputClass} placeholder="Name thy quest..." value={form.name}
+            onChange={e => setForm(f => ({...f, name: e.target.value}))} required />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Description</label>
+          <input className={inputClass} placeholder="What must be done..." value={form.description}
+            onChange={e => setForm(f => ({...f, description: e.target.value}))} />
+        </div>
+        <div>
+          <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Tier</label>
+          <select className={inputClass} value={form.tier}
+            onChange={e => setForm(f => ({...f, tier: e.target.value}))}>
+            <option value="daily">🔴 Daily Decree</option>
+            <option value="weekly">🟡 Weekly Quest</option>
+            <option value="bonus">🔵 Bonus Bounty</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Icon</label>
+          <select className={inputClass} value={form.icon}
+            onChange={e => setForm(f => ({...f, icon: e.target.value}))}>
+            {ICONS.map(ic => <option key={ic} value={ic}>{ic}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Gold Coins 🪙</label>
+          <input className={inputClass} type="number" min="1" max="100" value={form.coins}
+            onChange={e => setForm(f => ({...f, coins: Number(e.target.value)}))} />
+        </div>
+        <div>
+          <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">XP ⚡</label>
+          <input className={inputClass} type="number" min="1" max="500" value={form.xp}
+            onChange={e => setForm(f => ({...f, xp: Number(e.target.value)}))} />
+        </div>
+      </div>
+
+      {kids.length > 0 && (
+        <div>
+          <label className="block text-amber-900 text-xs font-bold mb-2 uppercase tracking-wide">
+            Assign To (leave empty = all)
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {kids.map(kid => (
+              <button key={kid.id} type="button"
+                onClick={() => toggleAssign(kid.id)}
+                className={`px-3 py-1 rounded-full text-xs border-2 font-semibold transition-all ${
+                  form.assignedTo.includes(kid.id)
+                    ? 'bg-amber-700 border-amber-500 text-amber-100'
+                    : 'bg-amber-100 border-amber-400 text-amber-800'
+                }`}>
+                {kid.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="recurring" checked={form.isRecurring}
+          onChange={e => setForm(f => ({...f, isRecurring: e.target.checked}))}
+          className="accent-amber-600" />
+        <label htmlFor="recurring" className="text-amber-900 text-xs font-semibold">Recurring quest</label>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={onCancel} className="btn-stone flex-1 py-2 text-sm">Cancel</button>
+        <button type="submit" className="btn-gold flex-1 py-2 text-sm">
+          {editChore ? '✅ Save Changes' : '⚔️ Add Quest'}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default function ManageChores({ onToast }) {
   const { family, dispatch } = useApp();
@@ -14,7 +95,6 @@ export default function ManageChores({ onToast }) {
   const [editChore, setEditChore] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(null);
 
-  // Form state
   const [form, setForm] = useState({
     name: '', description: '', icon: '📋', tier: 'daily',
     coins: 5, xp: 10, isRecurring: true, assignedTo: [],
@@ -25,7 +105,6 @@ export default function ManageChores({ onToast }) {
   }
 
   function handleAddPreloaded(chore) {
-    // Check not already added
     const alreadyAdded = family.chores.some(c => c.name === chore.name);
     if (alreadyAdded) { onToast('That quest is already on the board!', 'error'); return; }
     dispatch({ type: 'ADD_CHORE', ...chore, assignedTo: [] });
@@ -69,88 +148,7 @@ export default function ManageChores({ onToast }) {
     ? family.chores
     : family.chores.filter(c => c.tier === filterTier);
 
-  const inputClass = "w-full px-3 py-2 rounded border-2 border-amber-700 bg-amber-50 text-amber-900 focus:outline-none text-sm";
-
-  function ChoreForm({ onCancel }) {
-    return (
-      <form onSubmit={handleSubmitCustom} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
-            <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Quest Name</label>
-            <input className={inputClass} placeholder="Name thy quest..." value={form.name}
-              onChange={e => setForm(f => ({...f, name: e.target.value}))} required />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Description</label>
-            <input className={inputClass} placeholder="What must be done..." value={form.description}
-              onChange={e => setForm(f => ({...f, description: e.target.value}))} />
-          </div>
-          <div>
-            <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Tier</label>
-            <select className={inputClass} value={form.tier}
-              onChange={e => setForm(f => ({...f, tier: e.target.value}))}>
-              <option value="daily">🔴 Daily Decree</option>
-              <option value="weekly">🟡 Weekly Quest</option>
-              <option value="bonus">🔵 Bonus Bounty</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Icon</label>
-            <select className={inputClass} value={form.icon}
-              onChange={e => setForm(f => ({...f, icon: e.target.value}))}>
-              {ICONS.map(ic => <option key={ic} value={ic}>{ic}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">Gold Coins 🪙</label>
-            <input className={inputClass} type="number" min="1" max="100" value={form.coins}
-              onChange={e => setForm(f => ({...f, coins: Number(e.target.value)}))} />
-          </div>
-          <div>
-            <label className="block text-amber-900 text-xs font-bold mb-1 uppercase tracking-wide">XP ⚡</label>
-            <input className={inputClass} type="number" min="1" max="500" value={form.xp}
-              onChange={e => setForm(f => ({...f, xp: Number(e.target.value)}))} />
-          </div>
-        </div>
-
-        {/* Assign to kids */}
-        {family.kids.length > 0 && (
-          <div>
-            <label className="block text-amber-900 text-xs font-bold mb-2 uppercase tracking-wide">
-              Assign To (leave empty = all)
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {family.kids.map(kid => (
-                <button key={kid.id} type="button"
-                  onClick={() => toggleAssign(kid.id)}
-                  className={`px-3 py-1 rounded-full text-xs border-2 font-semibold transition-all ${
-                    form.assignedTo.includes(kid.id)
-                      ? 'bg-amber-700 border-amber-500 text-amber-100'
-                      : 'bg-amber-100 border-amber-400 text-amber-800'
-                  }`}>
-                  {kid.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2">
-          <input type="checkbox" id="recurring" checked={form.isRecurring}
-            onChange={e => setForm(f => ({...f, isRecurring: e.target.checked}))}
-            className="accent-amber-600" />
-          <label htmlFor="recurring" className="text-amber-900 text-xs font-semibold">Recurring quest</label>
-        </div>
-
-        <div className="flex gap-2 pt-1">
-          <button type="button" onClick={onCancel} className="btn-stone flex-1 py-2 text-sm">Cancel</button>
-          <button type="submit" className="btn-gold flex-1 py-2 text-sm">
-            {editChore ? '✅ Save Changes' : '⚔️ Add Quest'}
-          </button>
-        </div>
-      </form>
-    );
-  }
+  const choreFormProps = { onSubmit: handleSubmitCustom, form, setForm, editChore, kids: family.kids, toggleAssign };
 
   return (
     <div>
@@ -221,14 +219,14 @@ export default function ManageChores({ onToast }) {
       {/* Custom Add Modal */}
       {showAdd && (
         <Modal title="⚔️ Create Custom Quest" onClose={() => setShowAdd(false)} wide>
-          <ChoreForm onCancel={() => setShowAdd(false)} />
+          <ChoreForm {...choreFormProps} onCancel={() => setShowAdd(false)} />
         </Modal>
       )}
 
       {/* Edit Modal */}
       {editChore && (
         <Modal title="✏️ Edit Quest" onClose={() => setEditChore(null)} wide>
-          <ChoreForm onCancel={() => setEditChore(null)} />
+          <ChoreForm {...choreFormProps} onCancel={() => setEditChore(null)} />
         </Modal>
       )}
 
