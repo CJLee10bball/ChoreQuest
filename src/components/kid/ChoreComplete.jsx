@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Modal from '../shared/Modal';
 import { TIER_CONFIG } from '../../data/preloadedChores';
 
@@ -11,15 +11,19 @@ export default function ChoreComplete({ chore, kid, onConfirm, onCancel }) {
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
 
+  // Attach stream to the video element after it mounts (step must be 'camera' first)
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play();
+    }
+  }, [stream, step]);
+
   async function startCamera() {
     setCameraError('');
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       setStream(s);
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
-        videoRef.current.play();
-      }
       setStep('camera');
     } catch {
       setCameraError('Could not access the royal eye (camera). You may skip the photo.');
